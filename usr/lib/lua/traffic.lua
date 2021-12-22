@@ -8,7 +8,7 @@ local dbDict
 local dhcpDict
 
 function cmdfmt(str)
-  return str:gsub("\\", "\\\\"):gsub("`", "\\`"):gsub("\"", "\\\""):gsub("%$", "\\$")
+  return str:gsub("\\", "\\\\"):gsub("`", "\\`"):gsub("\"", "\\\"")
 end
 
 function get_hostname_init()
