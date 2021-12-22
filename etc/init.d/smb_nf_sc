@@ -1,0 +1,9 @@
+#!/bin/sh /etc/rc.common
+
+START=90
+
+start() {
+	KOPATH="/lib/modules/$(uname -r)/smb_nf_shortcut.ko"
+	[ -f "$KOPATH" ] || return 0
+	insmod "$KOPATH"
+}

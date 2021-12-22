@@ -1,0 +1,3 @@
+config noflushd settings
+	option name 'settings'
+	option enabled 1

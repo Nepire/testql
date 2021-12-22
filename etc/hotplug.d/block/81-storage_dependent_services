@@ -1,0 +1,46 @@
+#!/bin/sh
+# Copyright (C) 2016 Xiaomi MiWiFi
+#
+# Enable/disable storage-dependent services
+# A negative number is allowed in disk counter, since a remove could get processed
+# before its corresponding add due to hotplug2's parallel uevent processing.
+
+storage_dependent_services_lock="/var/lock/hotplug_storage_dependent_services.lock"
+scsi_disk_counter="/var/run/scsi_disk_count"
+
+[ $DEVTYPE = "disk" -a ${DEVNAME#sd} != $DEVNAME ] && {
+	lock $storage_dependent_services_lock
+
+	case "$ACTION" in
+		add)
+			scsi_disk_count=0
+			if [ -f $scsi_disk_counter ]; then
+				scsi_disk_count=$(cat $scsi_disk_counter)
+			fi
+			scsi_disk_count=$((scsi_disk_count + 1))
+			echo $scsi_disk_count > $scsi_disk_counter
+
+			if [ $scsi_disk_count -eq 1 ]; then
+				/etc/init.d/xunlei status
+				if [ $? -ne 0 ]; then
+					/etc/init.d/xunlei start
+				fi
+			fi
+			;;
+
+		remove)
+			scsi_disk_count=$(cat $scsi_disk_counter)
+			scsi_disk_count=$((scsi_disk_count - 1))
+			echo $scsi_disk_count > $scsi_disk_counter
+
+			# if [ $scsi_disk_count -eq 0 ]; then
+			# 	/etc/init.d/xunlei status
+			# 	if [ $? -eq 0 ]; then
+			# 		/etc/init.d/xunlei stop
+			# 	fi
+			# fi
+			;;
+	esac
+
+	lock -u $storage_dependent_services_lock
+}

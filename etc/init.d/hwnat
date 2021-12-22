@@ -1,0 +1,79 @@
+#!/bin/sh /etc/rc.common
+
+START=49
+
+EXTRA_COMMANDS="off"
+
+register_wifi_hwnat()
+{
+    is_reg=$1
+
+    reg_wifi()
+    {
+        cfg=$1
+        register=$2
+        local dev dev_type
+
+        config_get dev $cfg device
+        config_get dev_type $dev type
+
+        case $dev_type in
+            mt7615e*|mt7612|mt7603e* ) ;; # CONFIG_RA_HW_NAT_WIFI_NEW_ARCH
+            * ) return ;;
+        esac
+
+        config_get ifname $cfg ifname
+        if [ "$2" == "1" ]; then
+            iwpriv $ifname set hw_nat_register=1 >/dev/null 2>&1
+            # LanNatSpeedUpEn is enabled in mt7615e driver as default
+            #iwpriv $ifname set LanNatSpeedUpEn=1 >/dev/null 2>&1
+        else
+            iwpriv $ifname set hw_nat_register=0 >/dev/null 2>&1
+            #iwpriv $ifname set LanNatSpeedUpEn=0 >/dev/null 2>&1
+        fi
+    }
+
+    is_register=$1
+    . /lib/functions.sh
+    config_load wireless
+    config_foreach reg_wifi wifi-iface $is_reg
+
+    return 0
+}
+
+start() {
+    #put host+guest ip into hwnat
+    host_ip=`uci -q get network.lan.ipaddr`
+    guest_ip=`uci -q get network.guest.ipaddr`
+
+    # start hwnat
+    echo "create /dev/hwnat0"
+    ls /dev/hwnat0 >/dev/null 2>&1 || mknod /dev/hwnat0 c 220 0
+    echo "inserting hw_nat.ko!"
+    lsmod | grep hw_nat > /dev/null 2>&1 || insmod "/lib/modules/$(uname -r)/hw_nat.ko"
+
+    [ -n "$host_ip" ] && echo $host_ip > /proc/sys/net/hwqos/host_lan
+    [ -n "$guest_ip" ] && echo $guest_ip > /proc/sys/net/hwqos/guest_lan
+    echo "set host $host_ip and guest $guest_ip into hwqos done."
+
+    # try to refresh wireless interface into hwnat
+    # move reg-dev logic into hwnat-driver, so abandon it here
+    #register_wifi_hwnat 1
+
+    return 0
+}
+
+#hwnat enable for mt7621, so dummy stop to make system happy
+stop() {
+    echo "hwnat dummy stop."
+    return 0
+}
+
+off() {
+    echo "hwnat: removing hw_nat.ko"
+    # try to refresh wireless interface into hwnat
+    #register_wifi_hwnat 0
+
+    rmmod hw_nat
+    return 0
+}

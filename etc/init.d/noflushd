@@ -1,0 +1,101 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=01
+
+TIMEOUT=5	# default timeout in minutes (EDIT THIS!)
+
+#export command line for /usr/sbin/supervisord
+export PROCLINE="/usr/sbin/noflushd -n 5 /dev/sda"
+
+export EXTRA_HELP="
+            -------------------------------------------------
+            on                       Turn on  HDD hibernation
+            off                      Turn off HDD hibernation
+            -------------------------------------------------"
+export EXTRA_COMMANDS="on off noflushd_flag status"
+
+on(){
+	config_load "noflushd"
+	uci set noflushd.settings.enabled=1
+	uci commit
+
+	start
+}
+
+off(){
+	config_load "noflushd"
+	uci set noflushd.settings.enabled=0
+	uci commit
+
+	stop
+}
+
+#return: 0,enabled; 1 disabled
+noflushd_flag(){
+	config_load "noflushd"
+	local st
+	st=`uci get noflushd.settings.enabled 2>/dev/null`
+	if [ $st -eq "0" ]; then
+		return 1
+	fi
+	return 0
+}
+
+# status: 0, actived, 1, inactived
+status(){
+    /usr/sbin/supervisord status
+    return $?
+}
+
+start() {
+	noflushd_flag
+	if [ $? -ne "0" ]; then
+		echo 'noflushd is not enabled, exit.'
+		return 0
+	fi
+
+	status
+	if [ $? -eq "0" ]; then
+		echo 'noflushd already running, exit.'
+		return 0
+	fi
+
+	if [ ! -b /dev/sda ]; then
+		echo 'No harddisk, noflushd exit'
+		return 0
+	fi
+
+	bus=`/sbin/getdisk bus sda`
+	if [ "$bus" != "SATA" ]; then
+		echo 'Not SATA disk. noflushd exit'
+		return 0
+	fi
+
+	/usr/sbin/supervisord start
+
+	return $?
+}
+
+stop() {
+    status
+    if [ $? -ne "0" ]; then
+        echo 'noflushd is not running, exit.'
+        return 0
+    fi
+
+    nohup /usr/sbin/supervisord stop >/dev/null 2>&1 &
+    return 0
+}
+
+restart() {
+	stop
+	sleep 1
+	start
+	return $?
+}
+
+shutdown() {
+	stop
+	return $?
+}
