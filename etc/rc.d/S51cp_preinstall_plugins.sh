@@ -1,1 +1,0 @@
-../init.d/cp_preinstall_plugins.sh

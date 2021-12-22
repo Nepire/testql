@@ -1,1 +1,0 @@
-../init.d/plugin_start_script.sh
